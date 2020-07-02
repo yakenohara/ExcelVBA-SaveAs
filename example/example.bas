@@ -96,11 +96,11 @@ Private Function saveAs(ByVal str_type As String)
             
                 Case "CSV"
                     str_outFilePath = str_outDirPath & "\" & obj_sheet.Name & ".csv"
-                    ret = SaveAsAny.saveAsCSV(obj_sheet, str_outFilePath)
+                    ret = SaveAsAny.saveSheetAsCSV(obj_sheet, str_outFilePath)
                 
                 Case "JSON_KeyAndObj"
                     str_outFilePath = str_outDirPath & "\" & obj_sheet.Name & ".json"
-                    ret = SaveAsAny.saveAsJSON( _
+                    ret = SaveAsAny.saveSheetAsJSON( _
                         obj_sheet, _
                         str_outFilePath, _
                         arrayStyle:=False, _
@@ -109,7 +109,7 @@ Private Function saveAs(ByVal str_type As String)
                     
                 Case "JSON_ObjArray"
                     str_outFilePath = str_outDirPath & "\" & obj_sheet.Name & ".json"
-                    ret = SaveAsAny.saveAsJSON( _
+                    ret = SaveAsAny.saveSheetAsJSON( _
                         obj_sheet, _
                         str_outFilePath, _
                         arrayStyle:=True, _

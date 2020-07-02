@@ -29,7 +29,7 @@ Attribute VB_Name = "SaveAsAny"
 ' outPath : String
 '   保存先ファイルパス
 '
-Public Function saveAsCSV( _
+Public Function saveSheetAsCSV( _
     ByVal byThisSheet As Worksheet, _
     ByVal outPath As String _
 )
@@ -48,6 +48,38 @@ Public Function saveAsCSV( _
     Application.ScreenUpdating = True
     
 End Function
+
+'
+' セル範囲を CSV ファイルとして保存する
+'
+' Parameters
+' ----------
+' byThisSheet : Worksheet
+'   CSV として保存する Worksheet
+'
+' outPath : String
+'   保存先ファイルパス
+'
+Public Function saveRangeAsCSV( _
+    ByVal byThisRange As Range, _
+    ByVal outPath As String _
+)
+
+    Application.ScreenUpdating = False
+    
+    Set obj_newBook = Workbooks.Add
+    byThisRange.Copy
+    obj_newBook.Sheets(1).Range("A1").PasteSpecial
+    obj_newBook.Sheets(1).saveAs _
+        fileName:=outPath, _
+        FileFormat:=xlCSV
+    
+    obj_newBook.Close SaveChanges:=False
+    
+    Application.ScreenUpdating = True
+    
+End Function
+
 
 '
 ' ワークシートを JSON ファイルとして保存する
@@ -166,7 +198,7 @@ End Function
 ' indent : Integer default 4
 '   出力先 JSON ファイル内での indent 幅
 '
-Public Function saveAsJSON( _
+Public Function saveSheetAsJSON( _
     ByVal byThisSheet As Worksheet, _
     ByVal outPath As String, _
     Optional ByVal arrayStyle As Boolean = True, _
@@ -177,6 +209,145 @@ Public Function saveAsJSON( _
     Optional ByVal indent As Integer = 4 _
 )
     
+    '最終行取得
+    lng_maxRow = byThisSheet.Cells(Rows.Count, colNumOfLeft).End(xlUp).Row
+    
+    '最終列取得
+    lng_maxCol = byThisSheet.Cells(rowNumOfTitle, Columns.Count).End(xlToLeft).Column
+    
+    Set obj_toSaveRange = byThisSheet.Range(byThisSheet.Cells(rowNumOfTitle, colNumOfLeft), byThisSheet.Cells(lng_maxRow, lng_maxCol))
+    
+    x = saveRangeAsJSON( _
+        obj_toSaveRange, _
+        outPath, _
+        arrayStyle, _
+        typeGuessing, _
+        rowNumOfDataStart, _
+        indent _
+    )
+    
+End Function
+
+'
+' セル範囲を JSON ファイルとして保存する
+'
+' Parameters
+' ----------
+' byThisSheet : Worksheet
+'   JSON として保存する Worksheet
+'
+' outPath : String
+'   保存先ファイルパス
+'
+' arrayStyle : Boolean default True
+'   出力形式。
+'   True (as default) は 1 データを 1 Object として、それが配列として連なった形式。
+'   False は 1 データの最左列の値を Key 名、
+'
+'    e.g. 以下ののようなテーブルは、
+'
+'    | a   | bl_b  | b     | dbl_c | c   | d    | e      |
+'    | --- | ----- | ----- | ----- | --- | ---- | ------ |
+'    | 1   | TRUE  | TRUE  | 29    | 29  | stst | 1月1日 |
+'
+'    ↓ arrayStyle:=True だと、このようになる ↓
+'
+'    ```json
+'    [
+'        {
+'            "a":1,
+'            "bl_b":true,
+'            "b":true,
+'            "dbl_c":29,
+'            "c":29,
+'            "d":"stst",
+'            "e":"2020/01/01"
+'        }
+'    ]
+'    ```
+'
+'    ↓ arrayStyle:=False だと、このようになる ↓
+'    ```json
+'    {
+'        "1":{
+'            "bl_b":true,
+'            "b":true,
+'            "dbl_c":29,
+'            "c":29,
+'            "d":"stst",
+'            "e":"2020/01/01"
+'        }
+'    }
+'    ```
+'
+' typeGuessing : Integer default 0
+'   出力先 JSON ファイル内でのデータ型判定方法
+'   0 : 自動判定する。セルに入力されたデータの型に応じて決定する。
+'   e.g. arrayStyle の説明で使用したテーブル例を typeGuessing:=0 で実行すると以下のようになる
+'    ```json
+'    [
+'        {
+'            "a":1,
+'            "bl_b":true,
+'            "b":true,
+'            "dbl_c":29,
+'            "c":29,
+'            "d":"stst",
+'            "e":"2020/01/01"
+'        }
+'    ]
+'    ```
+'
+'   1 : Key 名につけた prefix で明示的に指定する。prefix の種類は以下の通り。
+'       bl_      : Boolean 型とする
+'       dbl_     : Double 型とする
+'       上記以外 : String 型とする
+'   e.g. arrayStyle の説明で使用したテーブル例を typeGuessing:=1 で実行すると以下のようになる
+'    ```json
+'    [
+'        {
+'            "a":"1",
+'            "bl_b":true,
+'            "b":"True",
+'            "dbl_c":29,
+'            "c":"29",
+'            "d":"stst",
+'            "e":"2020/01/01"
+'        }
+'    ]
+'    ```
+'
+'   2 : 型判定しない。すべてのセルの値は String 型として扱う。
+'   e.g. arrayStyle の説明で使用したテーブル例を typeGuessing:=2 で実行すると以下のようになる
+'    ```json
+'    [
+'        {
+'            "a":"1",
+'            "bl_b":"True",
+'            "b":"True",
+'            "dbl_c":"29",
+'            "c":"29",
+'            "d":"stst",
+'            "e":"2020/01/01"
+'        }
+'    ]
+'    ```
+'
+' rowNumOfDataStart : Long default 2
+'   データが開始される行 No
+'
+' indent : Integer default 4
+'   出力先 JSON ファイル内での indent 幅
+'
+Public Function saveRangeAsJSON( _
+    ByVal byThisRange As Range, _
+    ByVal outPath As String, _
+    Optional ByVal arrayStyle As Boolean = True, _
+    Optional ByVal typeGuessing As Integer = 0, _
+    Optional ByVal rowNumOfDataStart As Long = 2, _
+    Optional ByVal indent As Integer = 4 _
+)
+
     '変数定義
     Dim fileName, fileFolder, fileFile As String
     Dim u As Long
@@ -184,14 +355,7 @@ Public Function saveAsJSON( _
     Dim strarr_builder() As String
     Dim vararr_table As Variant
     
-     
-    '最終行取得
-    lng_maxRow = byThisSheet.Cells(Rows.Count, colNumOfLeft).End(xlUp).Row
-    
-    '最終列取得
-    lng_maxCol = byThisSheet.Cells(rowNumOfTitle, Columns.Count).End(xlToLeft).Column
-    
-    vararr_table = byThisSheet.Range(byThisSheet.Cells(rowNumOfTitle, colNumOfLeft), byThisSheet.Cells(lng_maxRow, lng_maxCol)).Value
+    vararr_table = byThisRange.Value
     
     lng_lIdx_1d = LBound(vararr_table, 1)
     lng_uIdx_1d = UBound(vararr_table, 1)
@@ -204,7 +368,7 @@ Public Function saveAsJSON( _
         
         Case 0 '自動判定の場合
             
-            lng_startIdxOfdata = lng_lIdx_1d + (rowNumOfDataStart - rowNumOfTitle)
+            lng_startIdxOfdata = lng_lIdx_1d + (rowNumOfDataStart - 1)
             For lng_colIdx = (lng_lIdx_2d) To lng_uIdx_2d
                 
                 var_tmp = vararr_table(lng_startIdxOfdata, lng_colIdx)
@@ -265,7 +429,7 @@ Public Function saveAsJSON( _
     End If
     
     'リストをオブジェクトに書き込む
-    lng_startIdxOfdata = lng_lIdx_1d + (rowNumOfDataStart - rowNumOfTitle)
+    lng_startIdxOfdata = lng_lIdx_1d + (rowNumOfDataStart - 1)
     For lng_rowIdx = lng_startIdxOfdata To lng_uIdx_1d
         
         If lng_startIdxOfdata < lng_rowIdx Then '2つ目以降の場合
@@ -309,7 +473,7 @@ Public Function saveAsJSON( _
                 
             End Select
             
-            If lng_colIdx <> lng_maxCol Then
+            If lng_colIdx <> lng_uIdx_2d Then
                 str_tmpStr3 = ","
             Else
                 str_tmpStr3 = ""
@@ -340,7 +504,7 @@ Public Function saveAsJSON( _
     
     'UTF-8 で保存
     ret = func_saveAsUTF8(Join(strarr_builder, vbCrLf), outPath)
- 
+    
 End Function
 
 '
@@ -380,7 +544,5 @@ Private Function func_saveAsUTF8(ByVal str_content As String, ByVal str_outPath 
     txt.Close
 
 End Function
-
-
 
 
