@@ -222,7 +222,7 @@ Public Function saveSheetAsJSON( _
         outPath, _
         arrayStyle, _
         typeGuessing, _
-        rowNumOfDataStart, _
+        (rowNumOfDataStart - rowNumOfTitle + 1), _
         indent _
     )
     
